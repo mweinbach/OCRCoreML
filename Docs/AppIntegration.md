@@ -1,76 +1,118 @@
 # App Integration
 
-This package is intentionally small: it loads a bundled CoreML detector, turns a
-`CGImage` into the expected tensor, runs prediction, and returns raw CoreML
-outputs.
+`OCRCoreML` packages the neural stages of the Nemotron OCR v2 English pipeline
+for Apple platforms. The app owns the geometric and graph post-processing that
+sits between those neural stages.
 
-## Lifecycle
+## Model Lifecycle
 
-Create `OCRDetector` once and keep it alive:
+Create `OCRPipeline` once and keep it alive:
 
 ```swift
-final class PageDetector {
-    private let detector: OCRDetector
+import OCRCoreML
+
+final class OCRService {
+    private let pipeline: OCRPipeline
 
     init() throws {
-        detector = try OCRDetector(computeUnits: .cpuAndGPU)
-    }
-
-    func detect(cgImage: CGImage) throws -> OCRDetectorPrediction {
-        try detector.prediction(for: cgImage)
+        pipeline = try OCRPipeline(computeUnits: .cpuAndGPU)
     }
 }
 ```
 
-`OCRDetector.init` compiles and loads the `.mlpackage`. That is expensive enough
-that it should be treated like app startup or pipeline setup work.
+Each model initializer compiles and loads an `.mlpackage`. Do this at app
+startup or pipeline setup time, not inside a per-image loop.
 
-## Choosing Compute Units
+## Stage Contracts
 
-Use `.cpuAndGPU` for lowest observed latency on the packaged detector. Use
-`.cpuAndNeuralEngine` when the app needs to reserve GPU time for rendering or
-other workloads and can tolerate higher detector latency.
+Detector:
 
 ```swift
-let latencyDetector = try OCRDetector(computeUnits: .cpuAndGPU)
-let aneDetector = try OCRDetector(computeUnits: .cpuAndNeuralEngine)
+let detectorInput = try OCRDetector.makeInputArray(from: cgImage)
+let detectorPrediction = try pipeline.detector.prediction(input: detectorInput)
 ```
 
-## Input Contract
+Input is `Float32[1, 3, 768, 768]`, RGB planar in `[0, 1]`.
 
-`OCRDetector.makeInputArray(from:)` resizes the image to `768 x 768`, converts to
-RGB planar order, normalizes pixels into `[0, 1]`, and returns
-`Float32[1, 3, 768, 768]`.
+Detector outputs:
 
-If your app uses a different image pipeline, make sure the tensor shape and
-normalization match exactly before calling:
+| output | shape |
+|---|---:|
+| `prob` | `[1, 192, 192]` |
+| `rboxes` | `[1, 192, 192, 5]` |
+| `features` | `[1, 128, 192, 192]` |
+
+Recognizer:
 
 ```swift
-let prediction = try detector.prediction(input: imageArray)
+let recognizerPrediction = try pipeline.recognizer.prediction(input: regions)
+let decoded = try pipeline.recognizer.decode(
+    logits: recognizerPrediction.output.logits,
+    count: detectedRegionCount
+)
 ```
 
-The package validates the input shape before calling CoreML.
+`regions` must be feature crops shaped `Float32[128, 128, 8, 32]`. Pad unused
+rows with zeros and pass the real count to downstream code.
 
-## Output Contract
+Recognizer outputs:
 
-`OCRDetectorPrediction.output` contains:
+| output | shape |
+|---|---:|
+| `logits` | `[128, 32, 858]` |
+| `features` | `[128, 32, 256]` |
 
-| property | CoreML output | shape |
-|---|---|---|
-| `prob` | text probability map | `[1, 192, 192]` |
-| `rboxes` | rotated box geometry | `[1, 192, 192, 5]` |
-| `features` | detector feature map | `[1, 128, 192, 192]` |
+Relational:
 
-The package does not implement FOTS/Nemotron post-processing. App code still
-needs thresholding, rotated-box decode, non-maximum suppression, crop/rectify,
-recognition, and any layout ordering needed by the product.
+```swift
+let relationalPrediction = try pipeline.relational.prediction(
+    rectifiedQuads: relationalRegionFeatures,
+    originalQuads: originalQuads,
+    recognizerFeatures: recognizerPrediction.output.features,
+    numValid: detectedRegionCount
+)
+```
 
-## Model Source
+Relational inputs:
 
-The same `Detector224.mlpackage` is available on Hugging Face:
+| input | shape |
+|---|---:|
+| `rectified_quads` | `[128, 128, 2, 3]` |
+| `original_quads` | `[128, 4, 2]` |
+| `recog_features` | `[128, 32, 256]` |
+| `num_valid` | `[1] Int32` |
 
-<https://huggingface.co/mweinbach1/ocr-coreml-detector-224>
+Relational outputs:
 
-The SwiftPM repository is:
+| output | shape |
+|---|---:|
+| `words` | `[128, 129]` |
+| `lines` | `[128, 129]` |
+| `line_log_var` | `[128, 129]` |
 
-<https://github.com/mweinbach/OCRCoreMLDetector>
+## Post-Processing Work Still Needed
+
+The upstream package relies on CUDA/C++ helpers for the non-neural pipeline.
+When integrating into an app, port or replace these pieces:
+
+| upstream helper | role |
+|---|---|
+| `rrect_to_quads` | convert dense detector rotated boxes to quadrangles |
+| `quad_non_maximal_suppression` | filter overlapping detector candidates |
+| `quad_rectify_forward` | build normalized sampling grids for each quad |
+| `IndirectGridSample` | sample detector feature maps into recognizer/relational crops |
+| `decode_sequences` | convert token IDs to text; a greedy Swift decoder is included |
+| `dense_relations_to_graph` | convert relation matrices into ordered text groups |
+
+Use the CLI smoke test to verify model packaging and model runtime before adding
+post-processing:
+
+```bash
+swift run ocr-coreml-smoke --compute-units gpu
+```
+
+## Model Bundle
+
+The same artifacts are published on Hugging Face:
+
+<https://huggingface.co/mweinbach1/nemotron-ocr-v2-coreml>
