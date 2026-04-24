@@ -16,7 +16,7 @@ pipeline:
 
 | stage | resource | input | outputs |
 |---|---|---|---|
-| detector | `Detector224.mlpackage` | `image: Float32[1, 3, 768, 768]` | `prob`, `rboxes`, `features` |
+| detector | `DetectorGPUInt8_768.mlpackage` | `image: Float32[1, 3, 768, 768]` | `prob`, `rboxes`, `features` |
 | recognizer | `RecognizerFeaturesInt8.mlpackage` | `regions: Float32[128, 128, 8, 32]` | `logits`, `features` |
 | relational | `RelationalInt8.mlpackage` | rectified regions, quads, recognizer features, valid count | `words`, `lines`, `line_log_var` |
 
@@ -48,7 +48,7 @@ not pretend to be a complete image-to-text OCR engine yet.
 Add the package to `Package.swift`:
 
 ```swift
-.package(url: "https://github.com/mweinbach/OCRCoreML.git", from: "0.2.0")
+.package(url: "https://github.com/mweinbach/OCRCoreML.git", from: "0.2.1")
 ```
 
 Then add `OCRCoreML` to your app target dependencies.
@@ -100,7 +100,7 @@ Local median latencies after warmup:
 
 | stage | GPU/ALL median | CPU+NE median | CPU median |
 |---|---:|---:|---:|
-| detector | 13.53 ms | 54.51 ms | 298.28 ms |
+| detector | 10.65 ms | 50.46 ms | 157.71 ms |
 | recognizer + features | 4.53 ms | 11.04 ms | 47.58 ms |
 | relational | 1.72 ms | 6.38 ms | 34.53 ms |
 

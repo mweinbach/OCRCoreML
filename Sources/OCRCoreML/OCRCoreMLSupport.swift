@@ -35,7 +35,7 @@ public struct OCRModelURLs {
     public static var bundled: OCRModelURLs {
         get throws {
             OCRModelURLs(
-                detector: try bundledURL(resource: "Detector224", extension: "mlpackage"),
+                detector: try bundledURL(resource: "DetectorGPUInt8_768", extension: "mlpackage"),
                 recognizer: try bundledURL(resource: "RecognizerFeaturesInt8", extension: "mlpackage"),
                 relational: try bundledURL(resource: "RelationalInt8", extension: "mlpackage")
             )

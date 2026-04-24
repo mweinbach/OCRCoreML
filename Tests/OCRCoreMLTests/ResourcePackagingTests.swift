@@ -11,9 +11,9 @@ import Testing
     let modelResources = packageRoot.appendingPathComponent("Sources/OCRCoreML/Resources")
     let smokeResources = packageRoot.appendingPathComponent("Sources/OCRCoreMLSmoke/Resources")
     let expectedFiles = [
-        "Detector224.mlpackage/Manifest.json",
-        "Detector224.mlpackage/Data/com.apple.CoreML/model.mlmodel",
-        "Detector224.mlpackage/Data/com.apple.CoreML/weights/weight.bin",
+        "DetectorGPUInt8_768.mlpackage/Manifest.json",
+        "DetectorGPUInt8_768.mlpackage/Data/com.apple.CoreML/model.mlmodel",
+        "DetectorGPUInt8_768.mlpackage/Data/com.apple.CoreML/weights/weight.bin",
         "RecognizerFeaturesInt8.mlpackage/Manifest.json",
         "RecognizerFeaturesInt8.mlpackage/Data/com.apple.CoreML/model.mlmodel",
         "RecognizerFeaturesInt8.mlpackage/Data/com.apple.CoreML/weights/weight.bin",

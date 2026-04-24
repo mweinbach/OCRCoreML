@@ -16,7 +16,7 @@ let package = Package(
         .target(
             name: "OCRCoreML",
             resources: [
-                .copy("Resources/Detector224.mlpackage"),
+                .copy("Resources/DetectorGPUInt8_768.mlpackage"),
                 .copy("Resources/RecognizerFeaturesInt8.mlpackage"),
                 .copy("Resources/RelationalInt8.mlpackage"),
                 .copy("Resources/charset.txt"),
