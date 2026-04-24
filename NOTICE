@@ -1,0 +1,6 @@
+Licensed by NVIDIA Corporation under the NVIDIA Open Model License.
+
+This package includes a CoreML conversion of the detector component from
+NVIDIA Nemotron OCR v2. The converted model weights inherit the NVIDIA Open
+Model License. The Swift wrapper code is provided for loading and running the
+converted CoreML package in Apple apps.
